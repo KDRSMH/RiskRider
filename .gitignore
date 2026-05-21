@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+yolo11n.pt
+best.pt
+*.pt
+runs/
+.env
