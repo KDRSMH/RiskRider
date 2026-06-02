@@ -94,7 +94,7 @@ Başlangıç skoru 100'dür. Kasksız tespitinde skor 40 puan azalır. Minimum s
 - Üniversite dönem projesi olarak geliştirilmiştir.
 - Kurye güvenliği ve iş güvenliği senaryoları için tasarlanmıştır.
 
-## Emeği Geçenler👤🤝
+## Emeği Geçenler👥🤝
 -Semih Kadir Yıldırım
 
 -Ayşe Pelin Demirel 
