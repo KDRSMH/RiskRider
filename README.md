@@ -1,106 +1,90 @@
 # RiskRider
 
-RiskRider, motosiklet sürücüsünün fotoğrafını yükleyerek çok faktörlü risk analizi yapan ve 0-100 arası Risk Skoru üreten yapay zeka destekli bir web uygulamasıdır. Sistem, YOLOv11 tespitleri ve Streamlit arayüzü ile sürücü güvenliğini otomatik olarak değerlendirir.
+RiskRider, motosiklet suruculerinin guvenligini analiz eden, goruntu, canli yayin ve video uzerinden risk skoru ureten yapay zeka destekli bir web uygulamasidir. Sistem YOLO tespitlerini kullanir ve Streamlit arayuzu ile kullanimi kolay bir deneyim sunar.
 
-## Projenin Mevcut Durumu
+## Ozellikler
 
-- YOLOv11 (pretrained `yolo11n.pt`) ile `person` ve `motorcycle` tespiti yapar
-- Streamlit tabanlı web arayüzü çalışır
-- Risk skoru hesaplama motoru hazırdır (0-100 arası)
-- Çok faktörlü risk analizi altyapısı kuruludur
-- Bounding box ile görsel tespit üretir
-- Güvenlik metrikleri ve bireysel tespit listesi gösterilir
+- Goruntu yukleyip tek tikla analiz
+- Canli IP Webcam/RTSP akisi uzerinden anlik tespit ve skor
+- MP4 video analizi ve zaman bazli risk grafigi
+- Tespitli goruntu ve detayli tespit listesi
+- Risk skoru ve risk seviyesi etiketleri
 
-## Özellikler
+## Ekran Goruntuleri
 
-- Görüntü yükleme ve tek tıkla analiz
-- Tespitli görüntü üretimi ve görselleştirme
-- Risk skoru ve seviye etiketi
-- Tetiklenen risk faktörleri listesi
-- Güvenlik metrikleri (kask/yelek/telefon vb.)
-- Modern ve sade Streamlit arayüzü
+### Goruntu Analizi
 
-## Proje Yapısı
+![Goruntu Analizi](img/görüntüAnalizi.png)
 
-```
-riskrider/
-├── app.py
-├── detect.py
-├── requirements.txt
-└── README.md
-```
+![Goruntu Analizi 2](img/GörüntüAnalizi-2.png)
+
+### Canli Yayin
+
+![Canli Yayin](img/CanlıYayın.png)
+
+### Video Analizi
+
+![Video Analizi](img/VideoAnalizi.png)
 
 ## Kurulum
 
+Sistem genelinde pip kurulumlari PEP 668 sebebiyle engellenebilecegi icin sanal ortam (venv) onerilir.
+
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Kullanım
+## Calistirma
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Ardından tarayıcınızda açılan arayüzden bir sürücü fotoğrafı yükleyin ve "Analiz Et" butonuna tıklayın.
+Ardindan tarayicida su adresi acin:
 
-## Risk Skoru Mantığı
+```
+http://localhost:8501
+```
 
-Başlangıç skoru 100'dür. Aşağıdaki risk faktörleri tespit edilirse skor düşer:
+## Kullanim
 
-- Kasksız: -40
-- Telefon kullanımı: -25
-- Yeleksiz: -20
-- Aşırı yük: -10
-- Ek yolcu: -5
+### Goruntu Analizi
 
-Minimum skor 0'dır.
+- JPG/JPEG/PNG formatinda goruntu yukleyin.
+- "Analiz Et" butonuna basin.
+
+### Canli Yayin
+
+- IP Webcam URL'si girin.
+- Ornek: http://IP_ADRESI:8080/video
+- "Baslat" butonuna basin.
+
+### Video Analizi
+
+- MP4 video dosyasi yukleyin.
+- "Videoyu Analiz Et" butonuna basin.
+
+## Model
+
+Uygulama, proje kok dizininde bulunan `best.pt` model dosyasini kullanir. Dosya yoksa sistem pasif gorunur ve tespitler calismaz.
+
+## Risk Skoru Mantigi
+
+Baslangic skoru 100'dur. Kasksiz tespitinde skor 40 puan azalir. Minimum skor 0'dur.
 
 ## Teknolojiler
 
 - Python
-- YOLOv11 (Ultralytics)
-- OpenCV
 - Streamlit
+- Ultralytics YOLO
+- OpenCV
 - Pillow
 - NumPy
+- Plotly
 
-## 🔜 Planlanan Özellikler
+## Proje Hakkinda
 
-1. Özel Eğitilmiş Model (best.pt)
-	- Roboflow veri seti ile eğitilecek
-	- Tespit edilecek sınıflar: helmet, no_helmet, vest, no_vest, phone_use, overloaded, passenger
-	- Google Colab üzerinde YOLOv11 fine-tuning
-
-2. IP Kamera / RTSP Stream Desteği
-	- Telefon IP Webcam uygulaması ile mobese simülasyonu
-	- Gerçek zamanlı risk analizi
-	- Stream URL girişi ile bağlantı
-
-3. Video Dosyası Analizi
-	- MP4 video yükleme
-	- Kare kare otomatik analiz
-	- Sonuç videosu indirme
-	- Zaman bazlı risk grafiği
-
-## Notlar
-
-- Mevcut model pretrained olduğu için kask/yelek sınıflarını henüz tanımıyor
-- Risk skoru altyapısı hazır; eğitilmiş model bağlandığında tam çalışacak
-- Final sunumunda tüm planlanan özellikler aktif olacak
-
-## Proje Hakkında
-
-- Üniversite dönem projesi olarak geliştirilmiştir
-- Yemeksepeti, Trendyol Go, Getir gibi kurye firmalarının sürücü güvenliğini otomatik denetlemesi senaryosu üzerine tasarlanmıştır
-- Trafik güvenliği ve iş güvenliği alanında yapay zeka uygulamasıdır
-
-## Gereksinimler
-
-```
-streamlit
-opencv-python
-ultralytics
-pillow
-numpy
-```
+- Universite donem projesi olarak gelistirilmistir.
+- Kurye guvenligi ve is guvenligi senaryolari icin tasarlanmistir.
