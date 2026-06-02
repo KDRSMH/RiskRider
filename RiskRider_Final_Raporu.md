@@ -296,14 +296,6 @@ Tespit edilen her nesne, sınıfa özgü renk kodlamasıyla ekrana yansıtılmak
 
 Risk skoru, **100 puan** başlangıç değerinden sınıf bazlı cezaların düşülmesiyle hesaplanmaktadır:
 
-| İhlal Sınıfı | Puan Düşümü | Gerekçe |
-|---|---|---|
-| `no_helmet` (Kasksız) | -40 | En kritik güvenlik ihlali |
-| `phone_use` (Telefon) | -25 | Dikkat dağınıklığı, yüksek kaza riski |
-| `no_vest` (Yeleksiz) | -20 | Görünürlük kaybı |
-| `overloaded` (Aşırı Yük) | -10 | Denge ve frenleme tehlikesi |
-| `passenger` (Ek Yolcu) | -5 | Ek risk faktörü |
-
 **Risk Seviyeleri:**
 
 | Skor Aralığı | Seviye |
