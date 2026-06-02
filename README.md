@@ -1,34 +1,40 @@
 # RiskRider
 
-RiskRider, motosiklet suruculerinin guvenligini analiz eden, goruntu, canli yayin ve video uzerinden risk skoru ureten yapay zeka destekli bir web uygulamasidir. Sistem YOLO tespitlerini kullanir ve Streamlit arayuzu ile kullanimi kolay bir deneyim sunar.
+RiskRider, motosiklet sürücülerinin güvenliğini analiz eden, görüntü, canlı yayın ve video üzerinden risk skoru üreten yapay zeka destekli bir web uygulamasıdır. Sistem YOLO tespitlerini kullanır ve Streamlit arayüzü ile hızlı, anlaşılır ve akıcı bir deneyim sunar.
 
-## Ozellikler
+## Özellikler
 
-- Goruntu yukleyip tek tikla analiz
-- Canli IP Webcam/RTSP akisi uzerinden anlik tespit ve skor
-- MP4 video analizi ve zaman bazli risk grafigi
-- Tespitli goruntu ve detayli tespit listesi
-- Risk skoru ve risk seviyesi etiketleri
+### Görüntü Analizi
 
-## Ekran Goruntuleri
+Tek bir fotoğraf yükleyerek sürücünün güvenlik durumunu anlık olarak değerlendirebilirsiniz. Sistem, tespit ettiği risklere göre skoru günceller ve sonuçları görselleştirir.
 
-### Goruntu Analizi
+![Görüntü Analizi](img/görüntüAnalizi.png)
 
-![Goruntu Analizi](img/görüntüAnalizi.png)
+![Görüntü Analizi 2](img/GörüntüAnalizi-2.png)
 
-![Goruntu Analizi 2](img/GörüntüAnalizi-2.png)
+### Canlı Yayın (IP Webcam / RTSP)
 
-### Canli Yayin
+Canlı akış üzerinden gerçek zamanlı tespit yapılır. Akış dalgalanmalarında kare atlama mantığı ile sistem stabil kalır ve arayüz donmadan çalışır.
 
-![Canli Yayin](img/CanlıYayın.png)
+![Canlı Yayın](img/CanlıYayın.png)
 
 ### Video Analizi
 
+MP4 video dosyaları kare kare analiz edilir. Zaman ekseninde risk skorunun nasıl değiştiğini grafikte takip edebilirsiniz.
+
 ![Video Analizi](img/VideoAnalizi.png)
+
+### Tespitli Görüntü ve Detaylı Liste
+
+Sistemin tespit ettiği her sınıf görsel üzerinde işaretlenir. Ayrıca tüm tespitler güven skorlarıyla birlikte listelenir.
+
+### Risk Skoru ve Seviye Etiketleri
+
+Skor 0-100 aralığında hesaplanır ve sonuç düşük, orta, yüksek gibi seviyelerle etiketlenir. Böylece çıktı tek bakışta anlaşılır.
 
 ## Kurulum
 
-Sistem genelinde pip kurulumlari PEP 668 sebebiyle engellenebilecegi icin sanal ortam (venv) onerilir.
+Sistem genelinde pip kurulumları PEP 668 sebebiyle engellenebileceği için sanal ortam (venv) önerilir.
 
 ```bash
 python -m venv .venv
@@ -36,43 +42,43 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Calistirma
+## Çalıştırma
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Ardindan tarayicida su adresi acin:
+Ardından tarayıcıda şu adresi açın:
 
 ```
 http://localhost:8501
 ```
 
-## Kullanim
+## Kullanım
 
-### Goruntu Analizi
+### Görüntü Analizi
 
-- JPG/JPEG/PNG formatinda goruntu yukleyin.
-- "Analiz Et" butonuna basin.
+- JPG/JPEG/PNG formatında görüntü yükleyin.
+- "Analiz Et" butonuna basın.
 
-### Canli Yayin
+### Canlı Yayın
 
 - IP Webcam URL'si girin.
-- Ornek: http://IP_ADRESI:8080/video
-- "Baslat" butonuna basin.
+- Örnek: http://IP_ADRESI:8080/video
+- "Başlat" butonuna basın.
 
 ### Video Analizi
 
-- MP4 video dosyasi yukleyin.
-- "Videoyu Analiz Et" butonuna basin.
+- MP4 video dosyası yükleyin.
+- "Videoyu Analiz Et" butonuna basın.
 
 ## Model
 
-Uygulama, proje kok dizininde bulunan `best.pt` model dosyasini kullanir. Dosya yoksa sistem pasif gorunur ve tespitler calismaz.
+Uygulama, proje kök dizininde bulunan `best.pt` model dosyasını kullanır. Dosya yoksa sistem pasif görünür ve tespitler çalışmaz.
 
-## Risk Skoru Mantigi
+## Risk Skoru Mantığı
 
-Baslangic skoru 100'dur. Kasksiz tespitinde skor 40 puan azalir. Minimum skor 0'dur.
+Başlangıç skoru 100'dür. Kasksız tespitinde skor 40 puan azalır. Minimum skor 0'dır.
 
 ## Teknolojiler
 
@@ -84,7 +90,7 @@ Baslangic skoru 100'dur. Kasksiz tespitinde skor 40 puan azalir. Minimum skor 0'
 - NumPy
 - Plotly
 
-## Proje Hakkinda
+## Proje Hakkında
 
-- Universite donem projesi olarak gelistirilmistir.
-- Kurye guvenligi ve is guvenligi senaryolari icin tasarlanmistir.
+- Üniversite dönem projesi olarak geliştirilmiştir.
+- Kurye güvenliği ve iş güvenliği senaryoları için tasarlanmıştır.
