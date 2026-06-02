@@ -3,8 +3,19 @@
 from __future__ import annotations
 
 import io
+import os
+import tempfile
+from pathlib import Path
 from typing import Dict, List, Tuple
 
+# Suppress noisy FFmpeg/OpenCV warnings (e.g. "Stream ends prematurely")
+# MUST be set before importing cv2.
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "error"
+os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
+
+import cv2  # noqa: E402
+import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
 
@@ -15,8 +26,10 @@ from detect import (
     is_model_available,
     run_detection,
 )
+from stream import frame_generator, open_stream, release_stream
+from video import analyze_video
 
-st.set_page_config(page_title="RiskRider", page_icon="R", layout="wide")
+st.set_page_config(page_title="RiskRider", page_icon="🏍", layout="wide")
 
 CSS = """
 <style>
@@ -243,6 +256,21 @@ html, body, [data-testid="stAppViewContainer"] {
   background: var(--success);
 }
 
+/* Stream frame styling */
+.stream-frame {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Video section */
+.video-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
 @media (max-width: 1100px) {
   .metric-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -262,12 +290,13 @@ st.markdown(
         <div class="title">RiskRider</div>
         <div class="subtitle">Motosiklet Sürücü Risk Analiz Sistemi</div>
       </div>
-      <div class="version">v1.0 BETA</div>
+      <div class="version">v2.0 BETA</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
+# ── Sidebar ──────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="sidebar-title">Parametreler</div>', unsafe_allow_html=True)
     confidence = st.slider("Güven Skoru", 0.10, 0.90, 0.40, 0.05)
@@ -286,60 +315,15 @@ with st.sidebar:
         )
 
     st.markdown('<div class="sidebar-line"></div>', unsafe_allow_html=True)
-    st.markdown('<div style="color:var(--muted);font-size:0.75rem;">RiskRider v1.0</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:var(--muted);font-size:0.75rem;">RiskRider v2.0</div>', unsafe_allow_html=True)
 
-left, right = st.columns(2)
 
-with left:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Görüntü Yükleme</div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="upload-hint">
-          <div>Görüntü yükleyin</div>
-          <div class="upload-subtext">Desteklenen formatlar: JPG, JPEG, PNG</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    upload = st.file_uploader("Görüntü yükleyin", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-    original_image = None
-    if upload is not None:
-        original_image = Image.open(io.BytesIO(upload.read())).convert("RGB")
-        st.image(original_image, caption="Orijinal Görüntü", use_container_width=True)
+# ═══════════════════════════════════════════════════════════════════════
+#  Helper: render risk results (shared by image & video tabs)
+# ═══════════════════════════════════════════════════════════════════════
 
-    st.markdown('<div class="button-primary">', unsafe_allow_html=True)
-    analyze = st.button("Analiz Et", use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with right:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Tespit Sonucu</div>', unsafe_allow_html=True)
-    if "annotated" in st.session_state:
-        st.image(st.session_state["annotated"], caption="Tespitli Görüntü", use_container_width=True)
-    else:
-        st.markdown('<div class="waiting-panel">Analiz bekleniyor</div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-if analyze and original_image is not None:
-    annotated, detections = run_detection(original_image, confidence)
-    st.session_state["annotated"] = annotated
-    st.session_state["detections"] = detections
-    score, level, triggered = calculate_risk_score(detections)
-    st.session_state["score"] = score
-    st.session_state["level"] = level
-    st.session_state["triggered"] = triggered
-
-if analyze and original_image is None:
-    st.warning("Lütfen önce bir görüntü yükleyin.")
-
-if "detections" in st.session_state:
-    detections: List[Dict] = st.session_state["detections"]
-    score = st.session_state["score"]
-    level = st.session_state["level"]
-    triggered = st.session_state["triggered"]
-
+def _render_risk_results(detections: List[Dict], score: int, level: str, triggered: List[Dict]):
+    """Render risk score card, triggered factors, safety metrics, and detection table."""
     if score >= 80:
         color = "var(--success)"
         bg = "rgba(16, 185, 129, 0.08)"
@@ -388,47 +372,41 @@ if "detections" in st.session_state:
         st.info("Risk faktörü tespit edilmedi.")
 
     st.markdown("### Güvenlik Metrikleri")
-    counts = {"helmet": 0, "no_helmet": 0, "vest": 0, "no_vest": 0, "phone_use": 0}
+    counts = {"B_helmet_worn": 0, "A_helmet_not_worn": 0, "C_Motorcycle": 0, "D_person": 0}
     for det in detections:
         key = det.get("class_name")
         if key in counts:
             counts[key] += 1
 
     metric_colors = {
-        "helmet": "var(--success)",
-        "no_helmet": "var(--danger)",
-        "vest": "var(--success)",
-        "no_vest": "var(--warning)",
-        "phone_use": "var(--danger)",
+        "B_helmet_worn": "var(--success)",
+        "A_helmet_not_worn": "var(--danger)",
+        "C_Motorcycle": "var(--accent)",
+        "D_person": "var(--warning)",
     }
 
     st.markdown(
         f"""
-        <div class="metric-grid">
+        <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr);">
           <div class="metric-card">
             <div class="metric-label">Kasklı</div>
-            <div class="metric-value">{counts['helmet']}</div>
-            <div class="metric-line" style="background:{metric_colors['helmet']}"></div>
+            <div class="metric-value">{counts['B_helmet_worn']}</div>
+            <div class="metric-line" style="background:{metric_colors['B_helmet_worn']}"></div>
           </div>
           <div class="metric-card">
             <div class="metric-label">Kasksız</div>
-            <div class="metric-value">{counts['no_helmet']}</div>
-            <div class="metric-line" style="background:{metric_colors['no_helmet']}"></div>
+            <div class="metric-value">{counts['A_helmet_not_worn']}</div>
+            <div class="metric-line" style="background:{metric_colors['A_helmet_not_worn']}"></div>
           </div>
           <div class="metric-card">
-            <div class="metric-label">Yelekit</div>
-            <div class="metric-value">{counts['vest']}</div>
-            <div class="metric-line" style="background:{metric_colors['vest']}"></div>
+            <div class="metric-label">Motosiklet</div>
+            <div class="metric-value">{counts['C_Motorcycle']}</div>
+            <div class="metric-line" style="background:{metric_colors['C_Motorcycle']}"></div>
           </div>
           <div class="metric-card">
-            <div class="metric-label">Yeleğiz</div>
-            <div class="metric-value">{counts['no_vest']}</div>
-            <div class="metric-line" style="background:{metric_colors['no_vest']}"></div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Telefon Kullanan</div>
-            <div class="metric-value">{counts['phone_use']}</div>
-            <div class="metric-line" style="background:{metric_colors['phone_use']}"></div>
+            <div class="metric-label">Kişi</div>
+            <div class="metric-value">{counts['D_person']}</div>
+            <div class="metric-line" style="background:{metric_colors['D_person']}"></div>
           </div>
         </div>
         """,
@@ -459,3 +437,315 @@ if "detections" in st.session_state:
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("Hiç tespit bulunamadı.")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Tabs
+# ═══════════════════════════════════════════════════════════════════════
+
+tab_image, tab_stream, tab_video = st.tabs(
+    ["📷 Görüntü Analizi", "📡 Canlı Stream", "🎬 Video Analizi"]
+)
+
+# ── Tab 1: Görüntü Analizi ────────────────────────────────────────────
+with tab_image:
+    left, right = st.columns(2)
+
+    with left:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Görüntü Yükleme</div>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="upload-hint">
+              <div>Görüntü yükleyin</div>
+              <div class="upload-subtext">Desteklenen formatlar: JPG, JPEG, PNG</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        upload = st.file_uploader("Görüntü yükleyin", type=["jpg", "jpeg", "png"], label_visibility="collapsed", key="img_upload")
+        original_image = None
+        if upload is not None:
+            original_image = Image.open(io.BytesIO(upload.read())).convert("RGB")
+            st.image(original_image, caption="Orijinal Görüntü", use_container_width=True)
+
+        st.markdown('<div class="button-primary">', unsafe_allow_html=True)
+        analyze = st.button("Analiz Et", use_container_width=True, key="img_analyze")
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with right:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Tespit Sonucu</div>', unsafe_allow_html=True)
+        if "annotated" in st.session_state:
+            st.image(st.session_state["annotated"], caption="Tespitli Görüntü", use_container_width=True)
+        else:
+            st.markdown('<div class="waiting-panel">Analiz bekleniyor</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if analyze and original_image is not None:
+        annotated, detections = run_detection(original_image, confidence)
+        st.session_state["annotated"] = annotated
+        st.session_state["detections"] = detections
+        score, level, triggered = calculate_risk_score(detections)
+        st.session_state["score"] = score
+        st.session_state["level"] = level
+        st.session_state["triggered"] = triggered
+
+    if analyze and original_image is None:
+        st.warning("Lütfen önce bir görüntü yükleyin.")
+
+    if "detections" in st.session_state:
+        _render_risk_results(
+            st.session_state["detections"],
+            st.session_state["score"],
+            st.session_state["level"],
+            st.session_state["triggered"],
+        )
+
+
+# ── Tab 2: Canlı Stream ──────────────────────────────────────────────
+with tab_stream:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📡 Canlı Kamera Akışı</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="upload-subtext" style="margin-bottom:12px;">'
+        "IP Webcam veya RTSP kamera URL'sini girin (örn: http://192.168.1.5:8080/video)</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    stream_url = st.text_input(
+        "Stream URL",
+        placeholder="http://192.168.1.5:8080/video",
+        label_visibility="collapsed",
+        key="stream_url",
+    )
+
+    col_start, col_stop = st.columns(2)
+    with col_start:
+        st.markdown('<div class="button-primary">', unsafe_allow_html=True)
+        start_stream = st.button("▶ Başlat", use_container_width=True, key="stream_start")
+        st.markdown("</div>", unsafe_allow_html=True)
+    with col_stop:
+        stop_stream = st.button("⏹ Durdur", use_container_width=True, key="stream_stop")
+
+    # Placeholders for live view
+    frame_placeholder = st.empty()
+    score_placeholder = st.empty()
+
+    if stop_stream:
+        st.session_state["streaming"] = False
+
+    if start_stream and stream_url:
+        st.session_state["streaming"] = True
+
+        # ── URL validation & auto-correction ──────────────────────────
+        url = stream_url.strip()
+
+        # IP Webcam doesn't support HTTPS
+        if url.startswith("https://"):
+            url = url.replace("https://", "http://", 1)
+            st.warning("⚠️ IP Webcam HTTPS desteklemez — otomatik olarak HTTP'ye çevrildi.")
+
+        # Ensure the URL has a path (IP Webcam needs /video)
+        if url.count("/") == 2 and not url.endswith("/"):
+            # URL is like http://IP:PORT with no path → append /video
+            url = url + "/video"
+            st.info(f"ℹ️ Endpoint eksikti, otomatik eklendi: `{url}`")
+        elif url.endswith("/"):
+            url = url + "video"
+            st.info(f"ℹ️ Endpoint eksikti, otomatik eklendi: `{url}`")
+
+        try:
+            cap = open_stream(url)
+        except ConnectionError as exc:
+            st.error(str(exc))
+            st.markdown(
+                "**💡 İpucu:** IP Webcam için doğru format → `http://IP_ADRESI:8080/video`",
+                unsafe_allow_html=True,
+            )
+            st.session_state["streaming"] = False
+            cap = None
+
+        if cap is not None:
+            try:
+                for pil_img in frame_generator(cap, url=url, interval=5, as_pil=True):
+                    if not st.session_state.get("streaming", False):
+                        break
+
+                    annotated_pil, detections = run_detection(pil_img, confidence)
+                    score, level, triggered = calculate_risk_score(detections)
+
+                    frame_placeholder.image(annotated_pil, caption="Canlı Akış", use_container_width=True)
+
+                    if score >= 80:
+                        s_color = "var(--success)"
+                        s_bg = "rgba(16, 185, 129, 0.08)"
+                    elif score >= 50:
+                        s_color = "var(--warning)"
+                        s_bg = "rgba(245, 158, 11, 0.08)"
+                    else:
+                        s_color = "var(--danger)"
+                        s_bg = "rgba(239, 68, 68, 0.08)"
+
+                    score_placeholder.markdown(
+                        f"""
+                        <div class="score-box" style="background:{s_bg}">
+                          <div>
+                            <div style="color:var(--muted);font-size:0.85rem;">Anlık Risk Skoru</div>
+                            <div class="score-value" style="color:{s_color}">{score}</div>
+                          </div>
+                          <div style="font-size:1rem;font-weight:700;">{level}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    # Generator exhausted — all reconnect attempts failed
+                    st.error("📡 Kamera bağlantısı kalıcı olarak kesildi. Lütfen URL'yi kontrol edip tekrar deneyin.")
+            finally:
+                release_stream(cap)
+                st.session_state["streaming"] = False
+
+    elif start_stream and not stream_url:
+        st.warning("Lütfen bir stream URL'si girin.")
+
+    if not st.session_state.get("streaming", False):
+        frame_placeholder.markdown(
+            '<div class="waiting-panel">Akış bekleniyor – URL girin ve Başlat\'a tıklayın</div>',
+            unsafe_allow_html=True,
+        )
+
+
+# ── Tab 3: Video Analizi ─────────────────────────────────────────────
+with tab_video:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🎬 Video Dosyası Analizi</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="upload-hint">
+          <div>MP4 video yükleyin</div>
+          <div class="upload-subtext">Video dosyasını yükleyin, sistem kare kare analiz edecektir</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    video_file = st.file_uploader(
+        "Video yükleyin",
+        type=["mp4"],
+        label_visibility="collapsed",
+        key="video_upload",
+    )
+
+    st.markdown('<div class="button-primary">', unsafe_allow_html=True)
+    analyze_vid = st.button("Videoyu Analiz Et", use_container_width=True, key="video_analyze")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if analyze_vid and video_file is not None:
+        # Save uploaded video to a temp file
+        tmp_input = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+        tmp_input.write(video_file.read())
+        tmp_input.flush()
+        tmp_input_path = tmp_input.name
+
+        progress_bar = st.progress(0.0, text="Video analiz ediliyor...")
+
+        def _update_progress(ratio: float) -> None:
+            progress_bar.progress(min(ratio, 1.0), text=f"İşleniyor: %{ratio*100:.0f}")
+
+        try:
+            output_path, timeline = analyze_video(
+                tmp_input_path,
+                confidence=confidence,
+                process_fps=2.0,
+                progress_callback=_update_progress,
+            )
+            progress_bar.progress(1.0, text="Analiz tamamlandı ✅")
+        except Exception as exc:
+            st.error(f"Video işlenirken hata: {exc}")
+            output_path, timeline = None, []
+
+        if output_path and Path(output_path).exists():
+            st.markdown("### İşlenmiş Video")
+            with open(output_path, "rb") as vf:
+                video_bytes = vf.read()
+
+            st.download_button(
+                label="📥 İşlenmiş Videoyu İndir",
+                data=video_bytes,
+                file_name="riskrider_analyzed.mp4",
+                mime="video/mp4",
+                use_container_width=True,
+            )
+
+        if timeline:
+            st.markdown("### Zaman Bazlı Risk Değişim Grafiği")
+
+            timestamps = [t[0] for t in timeline]
+            scores = [t[1] for t in timeline]
+
+            fig = go.Figure()
+
+            # Main risk score line
+            fig.add_trace(
+                go.Scatter(
+                    x=timestamps,
+                    y=scores,
+                    mode="lines+markers",
+                    name="Risk Skoru",
+                    line=dict(color="#3b82f6", width=2.5),
+                    marker=dict(size=5, color="#3b82f6"),
+                    fill="tozeroy",
+                    fillcolor="rgba(59,130,246,0.08)",
+                )
+            )
+
+            # Threshold lines
+            fig.add_hline(
+                y=80,
+                line_dash="dash",
+                line_color="#10b981",
+                line_width=1.5,
+                annotation_text="Düşük Risk (80)",
+                annotation_position="top left",
+                annotation_font_color="#10b981",
+            )
+            fig.add_hline(
+                y=50,
+                line_dash="dash",
+                line_color="#f59e0b",
+                line_width=1.5,
+                annotation_text="Orta Risk (50)",
+                annotation_position="top left",
+                annotation_font_color="#f59e0b",
+            )
+            fig.add_hline(
+                y=20,
+                line_dash="dash",
+                line_color="#ef4444",
+                line_width=1.5,
+                annotation_text="Yüksek Risk (20)",
+                annotation_position="top left",
+                annotation_font_color="#ef4444",
+            )
+
+            fig.update_layout(
+                xaxis_title="Zaman (saniye)",
+                yaxis_title="Risk Skoru",
+                yaxis=dict(range=[0, 105]),
+                template="plotly_dark",
+                paper_bgcolor="#111827",
+                plot_bgcolor="#0a0f1e",
+                font=dict(color="#f9fafb", family="system-ui, -apple-system, Segoe UI, Arial, sans-serif"),
+                margin=dict(l=40, r=20, t=30, b=40),
+                height=420,
+                showlegend=False,
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+    elif analyze_vid and video_file is None:
+        st.warning("Lütfen önce bir MP4 video dosyası yükleyin.")

@@ -2,60 +2,55 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
-MODEL_PATH = "yolo11n.pt"
+MODEL_PATH = "best.pt"
 
-# Colors in RGB
+# Colors in RGB – keys must match model output names exactly
 BOX_COLORS: Dict[str, Tuple[int, int, int]] = {
-    "no_helmet": (220, 20, 60),
-    "phone_use": (220, 20, 60),
-    "no_vest": (255, 140, 0),
-    "overloaded": (255, 215, 0),
-    "passenger": (255, 215, 0),
-    "helmet": (46, 204, 113),
-    "vest": (46, 204, 113),
-    "motorcycle": (52, 152, 219),
-    "person": (130, 130, 130),
+    "A_helmet_not_worn": (220, 20, 60),   # Kırmızı
+    "B_helmet_worn": (46, 204, 113),      # Yeşil
+    "C_Motorcycle": (52, 152, 219),       # Mavi
+    "D_person": (255, 215, 0),            # Sarı
 }
 
 CLASS_NAMES: Dict[str, str] = {
-    "no_helmet": "Kasksız",
-    "helmet": "Kasklı",
-    "no_vest": "Yeleğiz",
-    "vest": "Yelekit",
-    "phone_use": "Telefon Kullanımı",
-    "overloaded": "Aşırı Yük",
-    "passenger": "Ek Yolcu",
-    "motorcycle": "Motosiklet",
-    "person": "Kişi",
+    "A_helmet_not_worn": "Kasksız",
+    "B_helmet_worn": "Kasklı",
+    "C_Motorcycle": "Motosiklet",
+    "D_person": "Kişi",
 }
 
 RISK_WEIGHTS: Dict[str, int] = {
-    "no_helmet": 40,
-    "phone_use": 25,
-    "no_vest": 20,
-    "overloaded": 10,
-    "passenger": 5,
+    "A_helmet_not_worn": 40,
 }
 
 
+_model: YOLO | None = None
+
+
 def load_model() -> YOLO:
-    """Load YOLO model; auto-download if missing and never raise FileNotFoundError."""
-    try:
-        return YOLO(MODEL_PATH)
-    except FileNotFoundError:
-        # Ultralytics handles auto-download when given a model name.
-        return YOLO(MODEL_PATH)
+    """Load custom YOLO model (cached — only loaded from disk once)."""
+    global _model
+    if _model is not None:
+        return _model
+    if not Path(MODEL_PATH).exists():
+        raise FileNotFoundError(
+            f"Model dosyası bulunamadı: {MODEL_PATH}. "
+            "Lütfen eğitilmiş 'best.pt' dosyasını proje kök dizinine koyun."
+        )
+    _model = YOLO(MODEL_PATH)
+    return _model
 
 
 def is_model_available() -> bool:
-    """Return True to indicate model is available or will be auto-downloaded."""
-    return True
+    """Return True only if the model file physically exists on disk."""
+    return Path(MODEL_PATH).exists()
 
 
 def _safe_conf(conf: float) -> float:
