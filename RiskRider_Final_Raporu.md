@@ -334,7 +334,7 @@ RiskRider projesi, belirlenen tüm proje gereksinimlerini başarıyla karşılam
 - Projenin kritik sınıfı olan Kasklı tespitinde **%94.6 mAP50** ile yüksek doğruluk elde edilmiştir.
 - Eğitilen model, statik görüntülerde ve IP Webcam üzerinden gelen canlı akışlarda başarıyla çalıştırılmıştır.
 
-**Yazılım Mühendisliği Başarıları**
+**Başarılar**
 
 - Modüler mimari: `detect.py`, `stream.py`, `video.py` bağımsız modüller olarak tasarlanmıştır.
 - Özel CSS ve dark mode tema ile profesyonel Streamlit dashboard geliştirilmiştir.
