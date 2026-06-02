@@ -97,4 +97,5 @@ Başlangıç skoru 100'dür. Kasksız tespitinde skor 40 puan azalır. Minimum s
 
 ## Emeği Geçenler
 -Semih Kadir Yıldırım
+
 -Ayşe Pelin Demirel 
