@@ -341,10 +341,6 @@ RiskRider projesi, belirlenen tüm proje gereksinimlerini başarıyla karşılam
 - Fotoğraf, canlı stream ve video analizi için 3 sekmeli çok modlu arayüz hayata geçirilmiştir.
 - Risk skoru algoritması sınıf bazlı ağırlıklı puan düşme sistemiyle gerçekçi bir güvenlik değerlendirmesi sunmaktadır.
 
-**Gelecek Çalışmalar**
-
-Projenin ilerleyen sürümlerinde `vest`, `no_vest` ve `phone_use` sınıflarını kapsayan genişletilmiş bir veri setiyle modelin yeniden eğitilmesi, video analizi çıktılarının PDF raporu olarak dışa aktarılması ve mobil uyumlu arayüz desteği planlanmaktadır.
-
 ---
 
 *Bu rapor, RiskRider v1.0 BETA sürümünü kapsamaktadır.*
